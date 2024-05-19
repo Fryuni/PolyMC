@@ -23,8 +23,11 @@
       pkgs = forAllSystems (system: nixpkgs.legacyPackages.${system});
 
       packagesFn = pkgs: rec {
-        polymc = pkgs.libsForQt5.callPackage ./nix { inherit version self libnbtplusplus tomlplusplus; };
-        polymc-qt6 = pkgs.qt6Packages.callPackage ./nix { inherit version self libnbtplusplus tomlplusplus; };
+        polymc-unwrapped = pkgs.qt6Packages.callPackage ./nix/unwrapped.nix { inherit version self libnbtplusplus tomlplusplus; };
+        polymc-qt5-unwrapped = pkgs.libsForQt5.callPackage ./nix/unwrapped.nix { inherit version self libnbtplusplus tomlplusplus; };
+        polymc = pkgs.qt6Packages.callPackage ./nix { inherit version self polymc-unwrapped; };
+        polymc-qt5 = pkgs.libsForQt5.callPackage ./nix { inherit version self; polymc-unwrapped = polymc-qt5-unwrapped; };
+        default = polymc;
       };
     in
     {
@@ -33,6 +36,6 @@
         packages // { default = packages.polymc; }
       );
 
-      overlay = final: packagesFn;
+      overlay = final: prev: packagesFn final;
     };
 }

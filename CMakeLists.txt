@@ -132,12 +132,11 @@ set(Launcher_QT_VERSION_MAJOR "5" CACHE STRING "Major Qt version to build agains
 # https://docs.microsoft.com/en-us/legal/microsoft-identity-platform/terms-of-use
 set(Launcher_MSA_CLIENT_ID "6b329578-bfec-42a3-b503-303ab3f2ac96" CACHE STRING "Client ID you can get from Microsoft Identity Platform when you register an application")
 
-# By using this key in your builds you accept the terms and conditions laid down in
-# https://support.curseforge.com/en/support/solutions/articles/9000207405-curse-forge-3rd-party-api-terms-and-conditions
-# NOTE: CurseForge requires you to change this if you make any kind of derivative work.
 set(Launcher_CURSEFORGE_API_KEY "" CACHE STRING "API key for the CurseForge platform")
 set(Launcher_CURSEFORGE_API_KEY_API_URL "https://cf.polymc.org/api" CACHE STRING "URL to fetch the Curseforge API key from.")
 
+# Enable artificial DRM beyond what is forced by Mojang
+set(Launcher_STRICT_DRM OFF CACHE BOOL "Enables artificial DRM, beyond what is done by Mojang, that prevents you from using offline mode or custom yggdrasil without having a valid Minecraft account added first. This shouldn't need to be enabled unless you're distributing the software on some repo that would require you to enable it.")
 
 #### Check the current Git commit and branch
 include(GetGitRevisionDescription)
@@ -150,6 +149,13 @@ message(STATUS "Git refspec: ${Launcher_GIT_REFSPEC}")
 
 string(TIMESTAMP TODAY "%Y-%m-%d")
 set(Launcher_BUILD_TIMESTAMP "${TODAY}")
+
+############################ Macro Definitions #############################
+
+if (Launcher_STRICT_DRM)
+    message("Strict DRM is enabled.")
+    set(Launcher_APP_BINARY_DEFS ${Launcher_APP_BINARY_DEFS} LAUNCHER_STRICT_DRM)
+endif()
 
 ################################ 3rd Party Libs ################################
 

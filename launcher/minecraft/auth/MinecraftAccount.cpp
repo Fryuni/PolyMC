@@ -50,7 +50,39 @@
 
 #include "flows/MSA.h"
 #include "flows/Mojang.h"
+#include "flows/AuthlibInjector.h"
 #include "flows/Offline.h"
+#include "minecraft/auth/AccountData.h"
+
+// Basically the same as https://github.com/qt/qtbase/blob/5.12/src/corelib/plugin/quuid.cpp#L152C1-L173C2, but unfortunately they don't allow
+// us to specify a byte array for the namespace, we only get to specify a fixed length Uuid so I have to copy it and modify it ever so slightly.
+static QUuid createUuidFromName(const QByteArray &ns, const QByteArray &baseData, QCryptographicHash::Algorithm algorithm, int version)
+{
+    QByteArray hashResult;
+
+    // create a scope so later resize won't reallocate
+    {
+        QCryptographicHash hash(algorithm);
+        hash.addData(ns);
+        hash.addData(baseData);
+        hashResult = hash.result();
+    }
+    hashResult.resize(16); // Sha1 will be too long
+
+    QUuid result = QUuid::fromRfc4122(hashResult);
+
+    result.data3 &= 0x0FFF;
+    result.data3 |= (version << 12);
+    result.data4[0] &= 0x3F;
+    result.data4[0] |= 0x80;
+
+    return result;
+}
+
+static QUuid createUuidV3(const QByteArray &ns, const QByteArray &baseData)
+{
+    return createUuidFromName(ns, baseData, QCryptographicHash::Md5, 3);
+}
 
 MinecraftAccount::MinecraftAccount(QObject* parent) : QObject(parent) {
     data.internalId = QUuid::createUuid().toString().remove(QRegularExpression("[{}-]"));
@@ -82,6 +114,16 @@ MinecraftAccountPtr MinecraftAccount::createFromUsername(const QString &username
     return account;
 }
 
+MinecraftAccountPtr MinecraftAccount::createAuthlibInjectorFromUsername(const QString &username, QString baseUrl)
+{
+    MinecraftAccountPtr account = createFromUsername(username);
+    account->data.type = AccountType::AuthlibInjector;
+    account->data.authlibInjectorBaseUrl = baseUrl;
+    account->data.minecraftEntitlement.ownsMinecraft = true;
+    account->data.minecraftEntitlement.canPlayMinecraft = true;
+    return account;
+}
+
 MinecraftAccountPtr MinecraftAccount::createBlankMSA()
 {
     MinecraftAccountPtr account(new MinecraftAccount());
@@ -100,7 +142,7 @@ MinecraftAccountPtr MinecraftAccount::createOffline(const QString &username)
     account->data.yggdrasilToken.extra["clientToken"] = QUuid::createUuid().toString().remove(QRegularExpression("[{}-]"));
     account->data.minecraftEntitlement.ownsMinecraft = true;
     account->data.minecraftEntitlement.canPlayMinecraft = true;
-    account->data.minecraftProfile.id = QUuid::createUuid().toString().remove(QRegularExpression("[{}-]"));
+    account->data.minecraftProfile.id = createUuidV3("OfflinePlayer:", username.toUtf8()).toString().remove(QRegularExpression("[{}-]"));
     account->data.minecraftProfile.name = username;
     account->data.minecraftProfile.validity = Katabasis::Validity::Certain;
     return account;
@@ -132,7 +174,14 @@ QPixmap MinecraftAccount::getFace() const {
 shared_qobject_ptr<AccountTask> MinecraftAccount::login(QString password) {
     Q_ASSERT(m_currentTask.get() == nullptr);
 
-    m_currentTask.reset(new MojangLogin(&data, password));
+    if (data.type == AccountType::Mojang)
+    {
+        m_currentTask.reset(new MojangLogin(&data, password));
+    }
+    else if (data.type == AccountType::AuthlibInjector)
+    {
+        m_currentTask.reset(new AuthlibInjectorLogin(&data, password));
+    }
     connect(m_currentTask.get(), SIGNAL(succeeded()), SLOT(authSucceeded()));
     connect(m_currentTask.get(), SIGNAL(failed(QString)), SLOT(authFailed(QString)));
     connect(m_currentTask.get(), &Task::aborted, this, [this]{ authFailed(tr("Aborted")); });
@@ -172,6 +221,9 @@ shared_qobject_ptr<AccountTask> MinecraftAccount::refresh() {
     }
     else if(data.type == AccountType::Offline) {
         m_currentTask.reset(new OfflineRefresh(&data));
+    }
+    else if(data.type == AccountType::AuthlibInjector) {
+        m_currentTask.reset(new AuthlibInjectorRefresh(&data));
     }
     else {
         m_currentTask.reset(new MojangRefresh(&data));
@@ -300,8 +352,9 @@ void MinecraftAccount::fillSession(AuthSessionPtr session)
     session->player_name = data.profileName();
     // profile ID
     session->uuid = data.profileId();
-    // 'legacy' or 'mojang', depending on account type
+    // 'legacy' or 'mojang', or 'authlib-injector' depending on account type
     session->user_type = typeString();
+    session->authlib_injector_base_url = data.authlibInjectorBaseUrl;
     if (!session->access_token.isEmpty())
     {
         session->session = "token:" + data.accessToken() + ":" + data.profileId();

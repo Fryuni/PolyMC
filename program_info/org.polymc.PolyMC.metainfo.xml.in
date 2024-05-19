@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop">
   <id>org.polymc.PolyMC</id>
-  <provides>
-    <id>org.polymc.PolyMC</id>
-  </provides>
   <launchable type="desktop-id">org.polymc.PolyMC.desktop</launchable>
   <name>PolyMC</name>
   <developer_name>PolyMC</developer_name>
@@ -13,15 +10,15 @@
   <url type="homepage">https://polymc.org/</url>
   <url type="help">https://polymc.org/wiki/</url>
   <description>
-    <p>PolyMC is a custom launcher for Minecraft that focuses on predictability, long term stability and simplicity.</p>
+    <p>PolyMC is a custom launcher for Minecraft that focuses on predictability, long term stability, and simplicity.</p>
     <p>Features:</p>
     <ul>
-      <li>Easily install game modifications, such as Fabric, Forge and Quilt</li>
-      <li>Control your java settings</li>
+      <li>Easily install game modifications, such as Fabric, Forge, and Quilt</li>
+      <li>Control your Java settings</li>
       <li>Manage worlds and resource packs from the launcher</li>
       <li>See logs and other details easily</li>
       <li>Kill Minecraft in case of a crash/freeze</li>
-      <li>Isolate minecraft instances to keep everything clean</li>
+      <li>Isolate Minecraft instances to keep everything clean</li>
       <li>Install and update mods directly from the launcher</li>
     </ul>
   </description>
